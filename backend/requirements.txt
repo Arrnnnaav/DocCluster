@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+websockets
+python-multipart
+bertopic
+sentence-transformers
+umap-learn
+hdbscan
+pymupdf
+python-docx
+rank-bm25
+transformers
+torch
+accelerate
+numpy
+pandas
+scikit-learn

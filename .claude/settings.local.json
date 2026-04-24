@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(py -c \"import sys; print\\(sys.executable\\)\")",
+      "Bash(python -c \"import sys; print\\(sys.executable\\)\")",
+      "Bash(python -c \"import graphify\")",
+      "Bash(python -m pip install graphifyy -q)",
+      "Bash(python -c \"import graphify; print\\('ok'\\)\")",
+      "Bash(python -c \"import sys; open\\('graphify-out/.graphify_python','w'\\).write\\(sys.executable\\)\")",
+      "Bash(python *)",
+      "Bash(pip install *)",
+      "Bash(pip uninstall *)",
+      "Bash(python3 -m py_compile /d/textClust/backend/main.py)"
+    ]
+  }
+}
