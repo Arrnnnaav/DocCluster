@@ -96,3 +96,5 @@ docucluster_uploads/
 
 # Jupyter
 *.ipynb_checkpoints
+.claude/
+CLAUDE.md
