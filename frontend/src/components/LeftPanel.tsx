@@ -11,6 +11,7 @@ export function LeftPanel() {
   const minClusterSize = useAppStore((s) => s.minClusterSize);
   const setMinClusterSize = useAppStore((s) => s.setMinClusterSize);
   const topics = useAppStore((s) => s.topics);
+  const isProcessing = useAppStore((s) => s.isProcessing);
   const llmConfig = useAppStore((s) => s.llmConfig);
   const setLLMConfig = useAppStore((s) => s.setLLMConfig);
 
@@ -67,10 +68,6 @@ export function LeftPanel() {
     );
   };
 
-  const triggerRecluster = (n: number) => {
-    setMinClusterSize(n);
-    dispatchRun(n);
-  };
 
   return (
     <div className="flex flex-col h-full">
@@ -117,9 +114,10 @@ export function LeftPanel() {
         {files.length > 0 && (
           <button
             onClick={() => dispatchRun(minClusterSize)}
-            className="w-full font-mono text-xs px-3 py-1.5 rounded bg-accent/10 border border-accent/30 text-accent hover:bg-accent/20 transition-colors"
+            disabled={isProcessing}
+            className="w-full font-mono text-xs px-3 py-1.5 rounded bg-accent/10 border border-accent/30 text-accent hover:bg-accent/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Run Pipeline
+            {isProcessing ? "Running…" : "Run Pipeline"}
           </button>
         )}
 
@@ -165,7 +163,7 @@ export function LeftPanel() {
           max={20}
           step={1}
           value={minClusterSize}
-          onChange={(e) => triggerRecluster(Number(e.target.value))}
+          onChange={(e) => setMinClusterSize(Number(e.target.value))}
           className="w-full accent-[#7c3aed]"
         />
         <div className="font-mono text-[11px] text-text-secondary">

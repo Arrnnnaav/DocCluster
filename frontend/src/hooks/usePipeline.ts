@@ -20,6 +20,7 @@ type WsIncoming = {
       topic_id: number;
       source: string;
     }[];
+    chunk_map?: Record<string, { heading: string; source: string; topic_id: number }>;
   };
 };
 
@@ -34,6 +35,7 @@ export function usePipeline() {
   const setIsProcessing = useAppStore((s) => s.setIsProcessing);
   const setTopics = useAppStore((s) => s.setTopics);
   const setUmapPoints = useAppStore((s) => s.setUmapPoints);
+  const setChunkHeadings = useAppStore((s) => s.setChunkHeadings);
 
   const handleMessage = useCallback(
     (ev: MessageEvent<string>) => {
@@ -50,6 +52,13 @@ export function usePipeline() {
         if (msg.data) {
           setTopics(msg.data.topics);
           setUmapPoints(msg.data.umap_points);
+          if (msg.data.chunk_map) {
+            const headings: Record<string, string> = {};
+            for (const [cid, meta] of Object.entries(msg.data.chunk_map)) {
+              headings[cid] = meta.heading ?? "";
+            }
+            setChunkHeadings(headings);
+          }
         }
       } else if (stage === "error") {
         setIsProcessing(false);
@@ -57,7 +66,7 @@ export function usePipeline() {
         setIsProcessing(true);
       }
     },
-    [setPipelineStatus, setIsProcessing, setTopics, setUmapPoints]
+    [setPipelineStatus, setIsProcessing, setTopics, setUmapPoints, setChunkHeadings]
   );
 
   const getWs = useCallback((): WebSocket => {

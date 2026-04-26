@@ -12,10 +12,16 @@ class Clusterer:
         self.labels_: np.ndarray | None = None
         self.model_: hdbscan.HDBSCAN | None = None
 
-    def fit(self, reduced_embeddings_5d: np.ndarray, min_cluster_size: int = 5) -> np.ndarray:
+    def fit(
+        self,
+        reduced_embeddings_5d: np.ndarray,
+        min_cluster_size: int = 5,
+        min_samples: int | None = None,
+    ) -> np.ndarray:
         """Fit HDBSCAN on 5-D UMAP embeddings and return cluster labels."""
         self.model_ = hdbscan.HDBSCAN(
             min_cluster_size=min_cluster_size,
+            min_samples=min_samples if min_samples is not None else max(1, min_cluster_size // 3),
             metric="euclidean",
             cluster_selection_method="eom",
             prediction_data=True,

@@ -14,7 +14,7 @@ from ..parsers import parse_file
 from ..pipeline.clusterer import Clusterer
 from ..pipeline.embedder import Embedder
 from ..pipeline.reducer import Reducer
-from ..pipeline.topic_modeler import LLMConfig, TopicResult, run_topic_modeling
+from ..pipeline.topic_modeler import LLMConfig, LocalLLMCache, TopicResult, run_topic_modeling
 from ..search.bm25_index import BM25Index
 from ..search.hybrid_search import HybridSearch
 from ..search.semantic_search import SemanticSearch
@@ -45,6 +45,7 @@ class PipelineState:
     semantic: SemanticSearch | None = None
     hybrid: HybridSearch | None = None
     embedder: Embedder = field(default_factory=Embedder)
+    llm_cache: LocalLLMCache = field(default_factory=LocalLLMCache)
 
     def reset(self) -> None:
         self.uploaded_files.clear()
@@ -68,14 +69,16 @@ async def _send(ws: WebSocket, stage: str, message: str = "", data: dict[str, An
     await ws.send_text(json.dumps(payload))
 
 
-async def _run_pipeline(ws: WebSocket, min_cluster_size: int, llm_config: LLMConfig | None = None) -> None:
+async def _run_pipeline(ws: WebSocket, granularity: int, llm_config: LLMConfig | None = None) -> None:
     loop = asyncio.get_running_loop()
 
     await _send(ws, "parsing", "Parsing uploaded files")
     chunks: list[dict] = []
+    chunks_by_file: dict[str, list[dict]] = {}
     for f in STATE.uploaded_files.values():
         try:
             parsed = await loop.run_in_executor(None, parse_file, f["path"], f["filename"])
+            chunks_by_file[f["filename"]] = parsed
             chunks.extend(parsed)
         except Exception as exc:  # noqa: BLE001
             await _send(ws, "parsing", f"Skipped {f['filename']}: {exc}")
@@ -86,7 +89,13 @@ async def _run_pipeline(ws: WebSocket, min_cluster_size: int, llm_config: LLMCon
     STATE.chunks_by_id = {c["id"]: c for c in chunks}
     STATE.chunk_ids = [c["id"] for c in chunks]
 
-    await _send(ws, "embedding", f"Embedding {len(chunks)} chunks")
+    # Convert granularity slider value → HDBSCAN min_cluster_size
+    n_chunks = len(chunks)
+    min_cluster_size = max(3, n_chunks // max(1, granularity * 5))
+    min_samples = max(1, min_cluster_size // 3)
+    print(f"[pipeline] Granularity: {granularity}, min_cluster_size: {min_cluster_size}, min_samples: {min_samples}", flush=True)
+
+    await _send(ws, "embedding", f"Embedding {n_chunks} chunks")
     texts = [c["text"] for c in chunks]
     embeddings = await loop.run_in_executor(None, STATE.embedder.embed, texts)
     STATE.embeddings = embeddings
@@ -96,10 +105,10 @@ async def _run_pipeline(ws: WebSocket, min_cluster_size: int, llm_config: LLMCon
     reduced_5d, reduced_2d = await loop.run_in_executor(
         None, reducer.fit_transform_both, embeddings
     )
-
     await _send(ws, "clustering", "Clustering (HDBSCAN)")
     clusterer = Clusterer()
-    labels = await loop.run_in_executor(None, clusterer.fit, reduced_5d, min_cluster_size)
+    labels = await loop.run_in_executor(None, clusterer.fit, reduced_5d, min_cluster_size, min_samples)
+    print(f"[pipeline] Clusters found: {clusterer.cluster_count}, outliers: {int((labels == -1).sum())}", flush=True)
 
     await _send(ws, "outliers", "Reducing outliers + c-TF-IDF + labels")
 
@@ -122,6 +131,7 @@ async def _run_pipeline(ws: WebSocket, min_cluster_size: int, llm_config: LLMCon
         reduced_2d,
         llm_config or LLMConfig(),
         STATE.embedder.model,
+        STATE.llm_cache,
     )
     STATE.topic_result = topic_result
 
@@ -179,7 +189,7 @@ async def pipeline_websocket(ws: WebSocket) -> None:
                 await _send(ws, "error", "Invalid JSON")
                 continue
             if msg.get("action") == "run":
-                min_cs = int(msg.get("min_cluster_size", 5))
+                granularity = int(msg.get("min_cluster_size", 5))
                 raw_llm = msg.get("llm_config")
                 llm_cfg: LLMConfig | None = None
                 if isinstance(raw_llm, dict):
@@ -188,8 +198,9 @@ async def pipeline_websocket(ws: WebSocket) -> None:
                         model_name=raw_llm.get("model_name", "google/flan-t5-base"),
                         base_url=raw_llm.get("base_url", "http://localhost:11434"),
                     )
+                print(f"[pipeline] Granularity slider received: {granularity}", flush=True)
                 try:
-                    await _run_pipeline(ws, min_cs, llm_cfg)
+                    await _run_pipeline(ws, granularity, llm_cfg)
                 except Exception as exc:  # noqa: BLE001
                     await _send(ws, "error", f"Pipeline failed: {exc}")
             else:

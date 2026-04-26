@@ -1,16 +1,19 @@
 import { useAppStore } from "../store/useAppStore";
 import { ChunkList, ChunkRow } from "./ChunkList";
 import { TopicCard } from "./TopicCard";
+import { ClusterDictionary } from "./ClusterDictionary";
 
 export function RightPanel() {
   const selectedTopicId = useAppStore((s) => s.selectedTopicId);
   const setSelectedTopicId = useAppStore((s) => s.setSelectedTopicId);
   const topics = useAppStore((s) => s.topics);
+  const isProcessing = useAppStore((s) => s.isProcessing);
   const searchResults = useAppStore((s) => s.searchResults);
   const searchQuery = useAppStore((s) => s.searchQuery);
   const clearSearch = useAppStore((s) => s.clearSearch);
 
   const inSearchMode = searchResults.length > 0;
+  const showDictionary = topics.length > 0 && !isProcessing;
 
   return (
     <div className="flex flex-col h-full transition-opacity duration-200">
@@ -26,6 +29,8 @@ export function RightPanel() {
           topics={topics}
           onClose={() => setSelectedTopicId(null)}
         />
+      ) : showDictionary ? (
+        <ClusterDictionary />
       ) : (
         <EmptyState />
       )}

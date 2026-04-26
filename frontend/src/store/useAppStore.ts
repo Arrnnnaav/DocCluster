@@ -73,6 +73,7 @@ type AppState = {
   hoveredChunkId: string | null;
   searchQuery: string;
   isSearching: boolean;
+  chunkHeadings: Record<string, string>;
 
   addFiles: (files: FileEntry[]) => void;
   removeFile: (fileId: string) => void;
@@ -89,6 +90,7 @@ type AppState = {
   setSearchQuery: (q: string) => void;
   setIsSearching: (s: boolean) => void;
   clearSearch: () => void;
+  setChunkHeadings: (headings: Record<string, string>) => void;
   reset: () => void;
 };
 
@@ -128,6 +130,7 @@ export const useAppStore = create<AppState>((set) => ({
   hoveredChunkId: null,
   searchQuery: "",
   isSearching: false,
+  chunkHeadings: {},
 
   addFiles: (newFiles) =>
     set((state) => {
@@ -154,6 +157,7 @@ export const useAppStore = create<AppState>((set) => ({
   setHoveredChunkId: (hoveredChunkId) => set({ hoveredChunkId }),
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   setIsSearching: (isSearching) => set({ isSearching }),
+  setChunkHeadings: (chunkHeadings) => set({ chunkHeadings }),
   clearSearch: () =>
     set({
       searchResults: [],
@@ -171,5 +175,6 @@ export const useAppStore = create<AppState>((set) => ({
       matchedTopicIds: [],
       pipelineStatus: INITIAL_STATUS,
       isProcessing: false,
+      chunkHeadings: {},
     }),
 }));

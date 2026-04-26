@@ -23,13 +23,21 @@ class Reducer:
 
     def fit_transform_2d(self, embeddings: np.ndarray) -> np.ndarray:
         """Reduce to 2 dimensions for visualization."""
+        n = len(embeddings)
+        # Higher n_neighbors creates stronger global structure → clusters group visually
+        n_neighbors = min(50, max(10, n // 3))
         reducer = umap.UMAP(
             n_components=2,
-            min_dist=0.0,
+            n_neighbors=n_neighbors,
+            min_dist=0.05,
+            spread=1.0,
             metric="cosine",
             random_state=self.random_state,
+            low_memory=False,
         )
-        return reducer.fit_transform(embeddings)
+        coords = reducer.fit_transform(embeddings)
+        assert len(coords) == n, f"UMAP output {len(coords)} != input {n}"
+        return coords
 
     def fit_transform_both(
         self, embeddings: np.ndarray

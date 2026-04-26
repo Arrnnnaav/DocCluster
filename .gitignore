@@ -62,7 +62,9 @@ sentence_transformers_cache/
 models/
 checkpoints/
 
-# Model weights
+# Model weights / serialized objects
+*.pkl
+*.joblib
 *.bin
 *.safetensors
 *.pt
@@ -73,6 +75,7 @@ checkpoints/
 
 # ───────── Project-specific ─────────
 uploads/
+temp/
 data/
 graphify-out/
 docucluster_uploads/

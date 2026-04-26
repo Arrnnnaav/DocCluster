@@ -9,8 +9,8 @@ import re
 import uuid
 from pathlib import Path
 
-MAX_WORDS = 400
-MIN_WORDS = 40
+MAX_WORDS = 500
+MIN_WORDS = 20
 
 
 def _word_count(text: str) -> int:
@@ -20,6 +20,16 @@ def _word_count(text: str) -> int:
 def _split_paragraphs(text: str) -> list[str]:
     parts = re.split(r"\n\s*\n", text.strip())
     return [p.strip() for p in parts if p.strip()]
+
+
+def _split_by_words(text: str, max_words: int) -> list[str]:
+    """Hard split on word boundaries when paragraph markers are absent (e.g. raw PDF text)."""
+    words = text.split()
+    return [
+        " ".join(words[i : i + max_words])
+        for i in range(0, len(words), max_words)
+        if words[i : i + max_words]
+    ]
 
 
 def _make_chunk(text: str, heading: str, source: str, page: int) -> dict:
@@ -51,8 +61,11 @@ def chunk_sections(sections: list[dict]) -> list[dict]:
             intermediate.append(_make_chunk(combined, heading, source, page))
             continue
 
-        # Oversized section — split by paragraph, re-prepend heading to first part.
-        paragraphs = _split_paragraphs(text) or [text]
+        # Oversized section — split by paragraph; fall back to word-based split when
+        # the parser (e.g. PDF) emits lines joined with \n rather than \n\n.
+        paragraphs = _split_paragraphs(text)
+        if len(paragraphs) <= 1:
+            paragraphs = _split_by_words(text or combined, MAX_WORDS) or [combined]
         buffer: list[str] = []
         buffer_words = 0
         first = True
@@ -95,6 +108,20 @@ def chunk_sections(sections: list[dict]) -> list[dict]:
     return merged
 
 
+def _is_code_chunk(text: str) -> bool:
+    """Heuristic: return True when a chunk is mostly code, not prose."""
+    t = text.strip()
+    signals = [
+        t.startswith("import "),
+        t.startswith("from "),
+        t.startswith("def "),
+        t.startswith("class "),
+        t.count("\n") > 3 and "    " in t,   # indented block
+        t.count("(") + t.count(")") > 8,
+    ]
+    return sum(signals) >= 2
+
+
 def parse_file(filepath: str | Path, filename: str) -> list[dict]:
     """Auto-detect file type, parse, and chunk. Returns list of chunk dicts."""
     path = Path(filepath)
@@ -102,17 +129,18 @@ def parse_file(filepath: str | Path, filename: str) -> list[dict]:
 
     if ext == ".pdf":
         from .pdf_parser import parse_pdf
-
         sections = parse_pdf(path, filename)
     elif ext == ".docx":
         from .docx_parser import parse_docx
-
         sections = parse_docx(path, filename)
     elif ext in {".txt", ".md", ".markdown"}:
         from .txt_parser import parse_txt
-
         sections = parse_txt(path, filename)
     else:
         raise ValueError(f"Unsupported file type: {ext}")
 
-    return chunk_sections(sections)
+    result = chunk_sections(sections)
+    # Tag code-heavy chunks so topic_modeler can skip Flan-T5 for them
+    for c in result:
+        c["is_code"] = _is_code_chunk(c["text"])
+    return result

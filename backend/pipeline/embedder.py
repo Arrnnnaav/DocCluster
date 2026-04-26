@@ -1,10 +1,12 @@
 """Sentence embedder wrapping `thenlper/gte-small` with a lazy-loaded model."""
 from __future__ import annotations
 
+import torch
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
 MODEL_NAME = "thenlper/gte-small"
+_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 class Embedder:
@@ -17,7 +19,8 @@ class Embedder:
     @property
     def model(self) -> SentenceTransformer:
         if self._model is None:
-            self._model = SentenceTransformer(self.model_name)
+            self._model = SentenceTransformer(self.model_name, device=_DEVICE)
+            print(f"[embedder] Loaded {self.model_name} on {_DEVICE}", flush=True)
         return self._model
 
     def embed(self, texts: list[str]) -> np.ndarray:
